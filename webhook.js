@@ -1,5 +1,6 @@
 const { Configuration, OpenAIApi } = require("openai");
 const axios = require("axios");
+const crypto = require("crypto");
 
 const configuration = new Configuration({
   apiKey: process.env.OPENAI_API_KEY,
@@ -22,7 +23,22 @@ async function getAssistantResponse(userMessage) {
   }
 }
 
+function validateSignature(body, signature) {
+  const hash = crypto
+    .createHmac("sha256", process.env.LINE_CHANNEL_SECRET)
+    .update(body)
+    .digest("base64");
+  return hash === signature;
+}
+
 module.exports = async (req, res) => {
+  const signature = req.headers["x-line-signature"];
+  
+  // 檢查簽名是否有效
+  if (!validateSignature(JSON.stringify(req.body), signature)) {
+    return res.status(403).send("Forbidden");
+  }
+
   if (req.method === "POST") {
     const event = req.body.events[0];
     const userMessage = event.message.text;
